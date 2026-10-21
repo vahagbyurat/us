@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex,nofollow,noarchive,nosnippet">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#21160f">
+<script defer src="https://cloud.umami.is/script.js" data-website-id="3ecc2c56-766c-4955-a907-a615e0857f5c"></script>
 <title>Private</title>
 <style>
 :root{--ui:#f1e4cf;--uisoft:#bfa98a;--gold:#d9b66c;--bar:rgba(24,16,11,.86);--paperc:#fffdf8}
@@ -172,8 +173,13 @@ button,select,input{font:inherit;color:inherit}
 <div id="toast"></div>
 <script>
 'use strict';
-const W = {"s":"OlJCXjM7h9+WCYrvPAI9zA==","n":600000,"i":"kPEG9vd8vThi7D6y","c":"sNzPC+k1GCyAFuFAGvjGTLaVCxJaFzTWfx5y4N6c4nP9S+50QJlmCQ/Wa7H6n4kJ"};
-const BOOKF = 'b-40c7890b6efc4d0c.bin';
+const track = (n, d) => { try { if (!window.umami || !umami.track) return; const o = {}; for (const k in (d || {})) { const v = d[k]; if (v !== '' && v != null) o[k] = v; } umami.track(n, o); } catch (e) {} };
+let AU_ID = '';
+const PLAYCOUNT = {};
+const notePlay = (kind, id) => { const k = kind + ':' + id; PLAYCOUNT[k] = (PLAYCOUNT[k] || 0) + 1; return PLAYCOUNT[k]; };
+let VIA = 'open';
+const W = {"s":"cAcQzotLV2AwBYgIrgRjkA==","n":600000,"i":"2OcxdZcJ2BddVCC4","c":"KiHOipACIeyt5Md+EZmXa/N8Q601l4/VesUSepfl+MtrUtZj/XrVxwF/27xTtjvO"};
+const BOOKF = 'b-94235ea4527812c7.bin';
 const KEY = 'htru.k', SPOT = 'htru.at';
 const $ = id => document.getElementById(id);
 const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -204,6 +210,7 @@ async function openBook(raw) {
   if (M['font-hand']) { try { const ff = new FontFace('HW', await dec(await getBin('m/' + M['font-hand'].u))); await ff.load(); document.fonts.add(ff); } catch (e) {} }
   document.title = B.title || 'Our book';
   $('lock').style.display = 'none'; $('app').style.display = 'block';
+  track('book_open');
   start();
 }
 $('lf').onsubmit = async e => {
@@ -283,10 +290,13 @@ function after() {
   const first = t.length ? t[0] : null; if (first != null) store.set(SPOT, String(first));
   const hash = md ? '#' + md : first != null ? '#p' + (first + 1) : '';
   try { history.replaceState(null, '', hash || location.pathname); } catch (e) {}
+  const via = VIA; VIA = 'flip';
+  if (t.length) t.forEach(x => track('book_page', { page: x + 1, date: (B.pages[x] || {}).md || '', via: via }));
+  else track('book_page', { page: tokens(view).includes('cover') ? 'cover' : 'back', via: via });
 }
 function turn(dir) {
   if (busy) return; const a = view, b = view + dir; if (b < 0 || b >= S.length) return;
-  busy = true; stopAudio(); const A = S[a], Bv = S[b];
+  busy = true; VIA = 'flip'; stopAudio(); const A = S[a], Bv = S[b];
   const leaf = document.createElement('div'); leaf.className = 'leaf';
   const front = document.createElement('div'), back = document.createElement('div'); front.className = 'face front'; back.className = 'face back';
   leaf.appendChild(front); leaf.appendChild(back);
@@ -307,7 +317,7 @@ function turn(dir) {
   let fin = false; const end = () => { if (fin) return; fin = true; done(); leaf.remove(); view = b; busy = false; after(); };
   leaf.addEventListener('transitionend', e => { if (e.propertyName === 'transform') end(); }); setTimeout(end, 1100);
 }
-function goPage(i) { i = Math.max(0, Math.min(N - 1, i)); const v = S.findIndex(s => mode === 'spread' ? s.l === i || s.r === i : s.c === i); if (v >= 0) show(v); }
+function goPage(i, via) { i = Math.max(0, Math.min(N - 1, i)); const v = S.findIndex(s => mode === 'spread' ? s.l === i || s.r === i : s.c === i); if (v >= 0) { VIA = via || 'jump'; show(v); } }
 function goDate(md) { const i = B.pages.findIndex(p => p.md === md); if (i >= 0) { goPage(i); return true; } return false; }
 function today() { const d = new Date(); return pd(d.getMonth() + 1) + '-' + pd(d.getDate()); }
 function setMode() {
@@ -315,7 +325,7 @@ function setMode() {
   if (m === mode && S.length) return false;
   const keep = tokens(view).find(x => typeof x === 'number');
   mode = m; book.className = m === 'single' ? 'single' : ''; spreads(); slots();
-  if (keep != null) goPage(keep); else show(Math.min(view, S.length - 1)); return true;
+  if (keep != null) goPage(keep, 'resize'); else { VIA = 'resize'; show(Math.min(view, S.length - 1)); } return true;
 }
 const MS = new Set(), BMK = 'htru.bm';
 const bms = () => { try { return JSON.parse(store.get(BMK) || '[]'); } catch (e) { return []; } };
@@ -358,7 +368,7 @@ function toggleBm() {
   const t = nums(); if (!t.length) { toast('Open a page to bookmark it'); return; }
   let a = bms();
   if (a.some(b => t.includes(b.p))) { a = a.filter(b => !t.includes(b.p)); toast('Bookmark removed'); }
-  else { const p = t.find(x => B.pages[x].md) ?? t[0]; a.push({ p, at: Date.now() }); toast('Bookmarked ' + (B.pages[p].md ? fmtMd(B.pages[p].md) + ' · ' : '') + 'page ' + (p + 1)); }
+  else { const p = t.find(x => B.pages[x].md) ?? t[0]; a.push({ p, at: Date.now() }); track('bookmark_add', { page: p + 1, date: (B.pages[p] || {}).md || '' }); toast('Bookmarked ' + (B.pages[p].md ? fmtMd(B.pages[p].md) + ' · ' : '') + 'page ' + (p + 1)); }
   saveBms(a); paintBm();
 }
 function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove('on'), 2200); }
@@ -383,8 +393,8 @@ function start() {
   setMode();
   const h = decodeURIComponent(location.hash.slice(1)), at = store.get(SPOT);
   if (/^\d\d-\d\d$/.test(h) && goDate(h)) {}
-  else if (/^p\d+$/.test(h)) goPage(+h.slice(1) - 1);
-  else if (at != null) goPage(+at);
+  else if (/^p\d+$/.test(h)) goPage(+h.slice(1) - 1, 'open');
+  else if (at != null) goPage(+at, 'open');
   else show(0);
   addEventListener('resize', () => { if (!setMode()) place(view, false); });
   addEventListener('hashchange', () => { const x = decodeURIComponent(location.hash.slice(1)); if (/^\d\d-\d\d$/.test(x)) goDate(x); else if (/^p\d+$/.test(x)) goPage(+x.slice(1) - 1); });
@@ -394,7 +404,7 @@ function start() {
     if (e.target.tagName === 'SELECT') return;
     if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); turn(1); }
     else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); turn(-1); }
-    else if (e.key === 'Home') show(0); else if (e.key === 'End') show(S.length - 1);
+    else if (e.key === 'Home') { VIA = 'jump'; show(0); } else if (e.key === 'End') { VIA = 'jump'; show(S.length - 1); }
   });
   const st = $('stage'); let x0 = null, y0 = 0, t0 = 0;
   st.addEventListener('pointerdown', e => { x0 = e.clientX; y0 = e.clientY; t0 = Date.now(); });
@@ -405,9 +415,9 @@ function start() {
   st.addEventListener('click', e => {
     if (st.dataset.swiped) return;
     const go = e.target.closest('.tl'); if (go) { const n = +(go.querySelector('.tp') || {}).textContent; if (n) goPage(n - 1); else if (go.dataset.go) goDate(go.dataset.go); return; }
-    const vb = e.target.closest('.vid'); if (vb && vb.dataset.v) { playVideo(vb.dataset.v, vb.querySelector('img[data-m]')); return; }
+    const vb = e.target.closest('.vid'); if (vb && vb.dataset.v) { track('video_play_click', { id: vb.dataset.v, date: curMd(), pages: nums().map(x => x + 1).join('-') }); playVideo(vb.dataset.v, vb.querySelector('img[data-m]')); return; }
     const ab = e.target.closest('.obaud'); if (ab) { playAudio(ab); return; }
-    const im = e.target.closest('img[data-m]'); if (im && !im.classList.contains('coverimg') && im.src) { showImage(im.src); return; }
+    const im = e.target.closest('img[data-m]'); if (im && !im.classList.contains('coverimg') && im.src) { track('image_click', { id: im.dataset.m, date: curMd(), pages: nums().map(x => x + 1).join('-') }); showImage(im.src); return; }
     const r = st.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width;
     if (fx > 0.62) turn(1); else if (fx < 0.38) turn(-1);
   });
@@ -425,15 +435,20 @@ async function playVideo(id, poster) {
     const u = await mediaUrl(id, f => { load.textContent = 'Opening the video… ' + Math.round(f * 100) + '%'; });
     if (!lb.classList.contains('on')) return;
     lb.querySelectorAll(':scope > :not(.x)').forEach(n => n.remove());
-    const v = document.createElement('video'); v.controls = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.src = u; lb.appendChild(v); v.play().catch(() => {});
+    const v = document.createElement('video'); v.controls = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.src = u; lb.appendChild(v);
+    v.addEventListener('play', () => { const c = notePlay('v', id); track('video_play', { id: id, date: curMd(), plays: c }); if (c > 1) track('video_replay', { id: id, date: curMd() }); });
+    v.addEventListener('ended', () => track('video_ended', { id: id, date: curMd() }));
+    v.play().catch(() => {});
   } catch (e) { load.textContent = 'The video couldn’t load. Check the connection and try again.'; }
 }
 const AU = new Audio(); let abtn = null;
 function stopAudio() { AU.pause(); if (abtn) { abtn.classList.remove('on'); abtn.textContent = '▶ play'; abtn = null; } }
 AU.onended = stopAudio;
+AU.addEventListener('ended', () => track('audio_ended', { id: AU_ID, date: curMd() }));
+AU.addEventListener('pause', () => { if (!AU.ended && AU_ID) track('audio_pause', { id: AU_ID, seconds: Math.round(AU.currentTime) }); });
 async function playAudio(b) {
-  if (abtn === b) { stopAudio(); return; } stopAudio(); abtn = b; b.classList.add('on'); b.textContent = 'loading…';
-  try { const u = await mediaUrl(b.dataset.a, f => { if (abtn === b) b.textContent = Math.round(f * 100) + '%'; }); if (abtn !== b) return; AU.src = u; await AU.play(); b.textContent = '❚❚ pause'; }
+  if (abtn === b) { stopAudio(); return; } stopAudio(); abtn = b; AU_ID = b.dataset.a; b.classList.add('on'); b.textContent = 'loading…';
+  try { const u = await mediaUrl(b.dataset.a, f => { if (abtn === b) b.textContent = Math.round(f * 100) + '%'; }); if (abtn !== b) return; AU.src = u; await AU.play(); const c = notePlay('a', AU_ID); track('audio_play', { id: AU_ID, date: curMd(), plays: c }); if (c > 1) track('audio_replay', { id: AU_ID, date: curMd() }); b.textContent = '❚❚ pause'; }
   catch (e) { if (abtn === b) { stopAudio(); toast('The recording couldn’t load'); } }
 }
 </script>
